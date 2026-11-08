@@ -41,6 +41,18 @@ Steps:
 2. Append the new entry at the end of the file, with one blank line separating it from the previous content.
 3. Never edit or reorder existing entries.
 
-## 4. Confirm
+## 4. Commit and push
 
-Show the user the entry you added, in a short reply. Don't commit or push unless the user asks.
+Commit only `RESULTS.md`, even if other files have changes, then push the current branch:
+
+```bash
+git add RESULTS.md
+git commit -m "Log result: <task name> (<Result>)"
+git push -u origin "$(git branch --show-current)"
+```
+
+If the push fails because of a network error, retry up to 4 times, waiting 2s, 4s, 8s and 16s. If it fails for any other reason, such as a permission error, don't retry: tell the user the entry is committed locally but not pushed, and why.
+
+## 5. Confirm
+
+Show the user the entry you added, and say whether it was committed and pushed, in a short reply.
