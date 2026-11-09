@@ -15,3 +15,7 @@
 ### 2026-11-09 – Real canary check on canary branch
 - Result: Pass
 - What happened: Ran the existing canary.html on claude/create-index-html-4tfsez in headless Chromium and it returned CANARY: PASS.
+
+### 2026-11-09 – Status dashboard created
+- Result: Pass
+- What happened: dashboard.html shows live results from RESULTS.md and canary correctly checks it.
