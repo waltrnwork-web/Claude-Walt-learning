@@ -90,6 +90,29 @@
     .hold { background: #fff4d6; color: #8a6100; }
     .fail { background: #fde4e4; color: #b42318; }
     .unknown { background: #eceef1; color: #444; }
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin: 0 0 0.75rem;
+    }
+    .filters button {
+      font: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 0.25rem 0.9rem;
+      border: 1px solid #d4d8dd;
+      border-radius: 999px;
+      background: #fff;
+      color: #444;
+      cursor: pointer;
+    }
+    .filters button[aria-pressed="true"] {
+      background: #222;
+      border-color: #222;
+      color: #fff;
+    }
+    .empty { color: #666; padding: 0.9rem 0; }
     #note {
       margin: 1.5rem 0 0;
       font-size: 0.85rem;
@@ -110,6 +133,12 @@
     </section>
 
     <h2>Recent entries</h2>
+    <div class="filters" role="group" aria-label="Filter entries by result">
+      <button type="button" data-filter="all" aria-pressed="true">All</button>
+      <button type="button" data-filter="pass" aria-pressed="false">Pass</button>
+      <button type="button" data-filter="hold" aria-pressed="false">Hold</button>
+      <button type="button" data-filter="fail" aria-pressed="false">Fail</button>
+    </div>
     <ol id="entries"></ol>
 
     <p id="note"></p>
@@ -118,6 +147,8 @@
   <script>
     const SOURCE = "RESULTS.md";
     const MAX_ENTRIES = 5;
+    let allEntries = [];
+    let currentFilter = "all";
 
     // Used only when RESULTS.md can't be read (for example, opened from file://).
     const SAMPLE = [
@@ -159,9 +190,10 @@
     }
 
     function render(entries, note) {
+      allEntries = entries;
       // RESULTS.md appends new entries at the end, so newest is last.
-      const recent = entries.slice(-MAX_ENTRIES).reverse();
-      const latest = recent[0];
+      // The hero always shows the latest entry, whatever the filter.
+      const latest = entries[entries.length - 1];
 
       const hero = document.getElementById("hero");
       const status = document.getElementById("status");
@@ -176,8 +208,28 @@
       }
       status.dataset.status = latest ? statusClass(latest.result) : "none";
 
+      renderList();
+
+      document.getElementById("note").textContent = note;
+      document.title = "Status: " + status.textContent;
+    }
+
+    // Shows the most recent entries that match the current filter.
+    function renderList() {
+      const matching = currentFilter === "all"
+        ? allEntries
+        : allEntries.filter(e => statusClass(e.result) === currentFilter);
+      const recent = matching.slice(-MAX_ENTRIES).reverse();
+
       const list = document.getElementById("entries");
       list.replaceChildren();
+      if (!recent.length) {
+        const li = document.createElement("li");
+        li.className = "empty";
+        li.textContent = "No " + currentFilter[0].toUpperCase() + currentFilter.slice(1) + " entries.";
+        list.append(li);
+        return;
+      }
       for (const e of recent) {
         const li = document.createElement("li");
 
@@ -211,10 +263,16 @@
         }
         list.append(li);
       }
-
-      document.getElementById("note").textContent = note;
-      document.title = "Status: " + status.textContent;
     }
+
+    document.querySelectorAll(".filters button").forEach(btn => {
+      btn.addEventListener("click", () => {
+        currentFilter = btn.dataset.filter;
+        document.querySelectorAll(".filters button").forEach(b =>
+          b.setAttribute("aria-pressed", String(b === btn)));
+        renderList();
+      });
+    });
 
     fetch(SOURCE, { cache: "no-store" })
       .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); })
