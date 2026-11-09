@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Canary</title>
+  <style>
+    body { font-family: system-ui, sans-serif; display: grid; place-items: center; min-height: 100vh; margin: 0; background: #f5f6f8; }
+    #result { font-size: 2.5rem; font-weight: 700; }
+    .pass { color: #1e7b34; }
+    .fail { color: #b42318; }
+    #frame { position: absolute; width: 0; height: 0; border: 0; visibility: hidden; }
+  </style>
+</head>
+<body>
+  <div id="result">CANARY: …</div>
+  <iframe id="frame" title="dashboard check" aria-hidden="true"></iframe>
+  <script>
+    const PAGE = "index.html";
+    const SELECTOR = "h1";
+    const DASHBOARD = "dashboard.html";
+    const DASHBOARD_SELECTOR = "#status";
+    const DASHBOARD_TIMEOUT_MS = 5000;
+    const out = document.getElementById("result");
+
+    function show(ok, why) {
+      out.textContent = ok ? "CANARY: PASS" : "CANARY: FAIL";
+      out.className = ok ? "pass" : "fail";
+      if (!ok && why) out.title = why;
+      document.title = out.textContent;
+    }
+
+    // Check 1: the main page loads and has content in its h1.
+    function checkPage() {
+      return fetch(PAGE)
+        .then(r => { if (!r.ok) throw new Error(PAGE + " returned HTTP " + r.status); return r.text(); })
+        .then(html => {
+          const el = new DOMParser().parseFromString(html, "text/html").querySelector(SELECTOR);
+          if (!el || !el.textContent.trim()) throw new Error("No content found for " + SELECTOR + " in " + PAGE);
+        });
+    }
+
+    // Check 2: the dashboard loads and its script renders a Pass, Hold or Fail status.
+    // Its status is drawn by JavaScript, so it is loaded in a hidden iframe rather than parsed.
+    function checkDashboard() {
+      return fetch(DASHBOARD, { method: "HEAD" })
+        .then(r => { if (!r.ok) throw new Error(DASHBOARD + " returned HTTP " + r.status); })
+        .then(() => new Promise((resolve, reject) => {
+          const frame = document.getElementById("frame");
+          const started = Date.now();
+          function poll() {
+            let el = null;
+            try { el = frame.contentDocument && frame.contentDocument.querySelector(DASHBOARD_SELECTOR); } catch (e) {}
+            const text = el ? el.textContent.trim() : "";
+            if (/^(Pass|Hold|Fail)$/i.test(text)) return resolve();
+            if (Date.now() - started > DASHBOARD_TIMEOUT_MS) {
+              return reject(new Error(DASHBOARD + " did not show a Pass/Hold/Fail status in " + DASHBOARD_SELECTOR +
+                (text ? " (shows \"" + text + "\")" : "")));
+            }
+            setTimeout(poll, 100);
+          }
+          frame.addEventListener("load", poll, { once: true });
+          frame.src = DASHBOARD;
+        }));
+    }
+
+    checkPage()
+      .then(checkDashboard)
+      .then(() => show(true))
+      .catch(e => show(false, e.message));
+  </script>
+</body>
+</html>

@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Status Dashboard</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 2rem 1rem;
+      background: #f5f6f8;
+      color: #222;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+    }
+    main {
+      max-width: 640px;
+      margin: 2rem auto;
+      padding: 2rem 2.5rem;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    }
+    h1 {
+      margin: 0 0 1.5rem;
+      font-size: 1.25rem;
+      text-align: center;
+      color: #555;
+      font-weight: 600;
+    }
+    .hero {
+      text-align: center;
+      padding: 1.75rem 1rem;
+      border-radius: 10px;
+      margin-bottom: 2rem;
+    }
+    .hero .label {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+      opacity: 0.85;
+    }
+    #status {
+      font-size: 3.5rem;
+      font-weight: 800;
+      line-height: 1.1;
+      margin: 0.25rem 0;
+    }
+    #latest-task {
+      font-weight: 600;
+    }
+    #latest-date {
+      font-size: 0.9rem;
+      opacity: 0.85;
+    }
+    h2 {
+      font-size: 1.05rem;
+      margin: 0 0 0.75rem;
+    }
+    ol {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    li {
+      padding: 0.9rem 0;
+      border-top: 1px solid #e6e8eb;
+    }
+    li:first-child { border-top: 0; }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 1rem;
+    }
+    .task { font-weight: 600; }
+    .date { color: #666; font-size: 0.85rem; white-space: nowrap; }
+    .what { color: #444; margin: 0.25rem 0 0; }
+    .next { color: #666; font-size: 0.9rem; margin: 0.15rem 0 0; }
+    .badge {
+      display: inline-block;
+      padding: 0.1rem 0.7rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-right: 0.5rem;
+    }
+    .pass { background: #e3f6e8; color: #1e7b34; }
+    .hold { background: #fff4d6; color: #8a6100; }
+    .fail { background: #fde4e4; color: #b42318; }
+    .unknown { background: #eceef1; color: #444; }
+    #note {
+      margin: 1.5rem 0 0;
+      font-size: 0.85rem;
+      color: #666;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Claude Code Experiment Status</h1>
+
+    <section id="hero" class="hero unknown" aria-live="polite">
+      <div class="label">Latest result</div>
+      <div id="status">…</div>
+      <div id="latest-task"></div>
+      <div id="latest-date"></div>
+    </section>
+
+    <h2>Recent entries</h2>
+    <ol id="entries"></ol>
+
+    <p id="note"></p>
+  </main>
+
+  <script>
+    const SOURCE = "RESULTS.md";
+    const MAX_ENTRIES = 5;
+
+    // Used only when RESULTS.md can't be read (for example, opened from file://).
+    const SAMPLE = [
+      { date: "2026-11-09", task: "Real canary check on canary branch", result: "Pass", what: "Ran the existing canary.html in headless Chromium and it returned CANARY: PASS." },
+      { date: "2026-11-09", task: "Canary skill first run", result: "Pass", what: "Created canary.html, which correctly returned CANARY: PASS on the current index.html." },
+      { date: "2026-11-08", task: "First HTML page", result: "Pass", what: "Clean index.html created and pushed." }
+    ];
+
+    // Parses entries in the log-result format:
+    // ### YYYY-MM-DD – task name
+    // - Result: Pass | Hold | Fail
+    // - What happened: ...
+    // - Next: ...            (optional)
+    function parseResults(md) {
+      const entries = [];
+      let cur = null;
+      for (const raw of md.split(/\r?\n/)) {
+        const line = raw.trim();
+        const head = line.match(/^###\s+(\d{4}-\d{2}-\d{2})\s*[–-]\s*(.+)$/);
+        if (head) {
+          cur = { date: head[1], task: head[2].trim(), result: "", what: "", next: "" };
+          entries.push(cur);
+          continue;
+        }
+        if (!cur) continue;
+        const field = line.match(/^-\s*(Result|What happened|Next):\s*(.*)$/i);
+        if (!field) continue;
+        const key = field[1].toLowerCase();
+        if (key === "result") cur.result = field[2].trim();
+        else if (key === "what happened") cur.what = field[2].trim();
+        else cur.next = field[2].trim();
+      }
+      return entries;
+    }
+
+    function statusClass(result) {
+      const r = (result || "").toLowerCase();
+      return ["pass", "hold", "fail"].includes(r) ? r : "unknown";
+    }
+
+    function render(entries, note) {
+      // RESULTS.md appends new entries at the end, so newest is last.
+      const recent = entries.slice(-MAX_ENTRIES).reverse();
+      const latest = recent[0];
+
+      const hero = document.getElementById("hero");
+      const status = document.getElementById("status");
+      if (latest) {
+        hero.className = "hero " + statusClass(latest.result);
+        status.textContent = latest.result || "Unknown";
+        document.getElementById("latest-task").textContent = latest.task;
+        document.getElementById("latest-date").textContent = latest.date;
+      } else {
+        hero.className = "hero unknown";
+        status.textContent = "No results";
+      }
+      status.dataset.status = latest ? statusClass(latest.result) : "none";
+
+      const list = document.getElementById("entries");
+      list.replaceChildren();
+      for (const e of recent) {
+        const li = document.createElement("li");
+
+        const row = document.createElement("div");
+        row.className = "row";
+        const left = document.createElement("div");
+        const badge = document.createElement("span");
+        badge.className = "badge " + statusClass(e.result);
+        badge.textContent = e.result || "?";
+        const task = document.createElement("span");
+        task.className = "task";
+        task.textContent = e.task;
+        left.append(badge, task);
+        const date = document.createElement("span");
+        date.className = "date";
+        date.textContent = e.date;
+        row.append(left, date);
+        li.append(row);
+
+        if (e.what) {
+          const p = document.createElement("p");
+          p.className = "what";
+          p.textContent = e.what;
+          li.append(p);
+        }
+        if (e.next) {
+          const p = document.createElement("p");
+          p.className = "next";
+          p.textContent = "Next: " + e.next;
+          li.append(p);
+        }
+        list.append(li);
+      }
+
+      document.getElementById("note").textContent = note;
+      document.title = "Status: " + status.textContent;
+    }
+
+    fetch(SOURCE, { cache: "no-store" })
+      .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); })
+      .then(md => {
+        const entries = parseResults(md);
+        if (!entries.length) throw new Error("no entries found");
+        render(entries, "Live from " + SOURCE + " · " + entries.length + " entries total");
+      })
+      .catch(err => render(SAMPLE, "Showing sample data (couldn't read " + SOURCE + ": " + err.message + ")"));
+  </script>
+</body>
+</html>
