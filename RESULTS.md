@@ -7,3 +7,7 @@
 ### 2026-11-09 – Canary skill first run
 - Result: Pass
 - What happened: Created canary.html, which correctly returned CANARY: PASS on the current index.html.
+
+### 2026-11-09 – Canary skill triggered correctly
+- Result: Pass
+- What happened: Ran canary.html on the proper branch and it returned CANARY: PASS.
