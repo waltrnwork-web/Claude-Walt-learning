@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Canary</title>
+  <style>
+    body { font-family: system-ui, sans-serif; display: grid; place-items: center; min-height: 100vh; margin: 0; background: #f5f6f8; }
+    #result { font-size: 2.5rem; font-weight: 700; }
+    .pass { color: #1e7b34; }
+    .fail { color: #b42318; }
+  </style>
+</head>
+<body>
+  <div id="result">CANARY: …</div>
+  <script>
+    const PAGE = "index.html";
+    const SELECTOR = "h1";
+    const out = document.getElementById("result");
+    function show(ok, why) {
+      out.textContent = ok ? "CANARY: PASS" : "CANARY: FAIL";
+      out.className = ok ? "pass" : "fail";
+      if (!ok && why) out.title = why;
+      document.title = out.textContent;
+    }
+    fetch(PAGE)
+      .then(r => { if (!r.ok) throw new Error(PAGE + " returned HTTP " + r.status); return r.text(); })
+      .then(html => {
+        const el = new DOMParser().parseFromString(html, "text/html").querySelector(SELECTOR);
+        if (el && el.textContent.trim()) show(true);
+        else show(false, "No content found for " + SELECTOR + " in " + PAGE);
+      })
+      .catch(e => show(false, e.message));
+  </script>
+</body>
+</html>
